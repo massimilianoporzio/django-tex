@@ -11,12 +11,12 @@ DEFAULT_INTERPRETER = "lualatex"
 
 
 def run_tex(source, template_name=None):
-    with tempfile.TemporaryDirectory() as tempdir:
-        return run_tex_in_directory(source, tempdir, template_name=template_name)
+    tempdir = getattr(settings, 'LATEX_DIR', '.')
+    return run_tex_in_directory(source, tempdir, template_name=template_name)
 
 
 def run_tex_in_directory(source, directory, template_name=None):
-    filename = "texput.tex"
+    filename = os.path.join(directory, 'texput.tex')
     command = getattr(settings, "LATEX_INTERPRETER", DEFAULT_INTERPRETER)
     latex_interpreter_options = getattr(settings, "LATEX_INTERPRETER_OPTIONS", "")
     with open(os.path.join(directory, filename), "x", encoding="utf-8") as f:
@@ -24,6 +24,7 @@ def run_tex_in_directory(source, directory, template_name=None):
     args = f'cd "{directory}" && {command} -interaction=batchmode {latex_interpreter_options} {filename}'
     try:
         run(args, shell=True, stdout=PIPE, stderr=PIPE, check=True)
+        os.remove(filename)
     except CalledProcessError as called_process_error:
         try:
             with open(
@@ -33,7 +34,9 @@ def run_tex_in_directory(source, directory, template_name=None):
         except FileNotFoundError:
             raise called_process_error
         else:
+            os.remove(filename)
             raise TexError(log=log, source=source, template_name=template_name)
+
     with open(os.path.join(directory, "texput.pdf"), "rb") as f:
         pdf = f.read()
     return pdf
